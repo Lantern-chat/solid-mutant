@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "baseUrl": "src",
+    "outDir": "build/dist",
+    //"module": "commonjs",
+    "module": "ESNext",
+    "target": "ESNext",
+    "lib": [
+      "es6",
+      "dom"
+    ],
+    "noEmit": true,
+    "sourceMap": true,
+    "allowJs": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "moduleResolution": "node",
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    //"experimentalDecorators": true,
+    "alwaysStrict": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
+    "importHelpers": true,
+    "strictNullChecks": true,
+    "suppressImplicitAnyIndexErrors": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "strictPropertyInitialization": true
+  },
+  "include": [
+    "./src/**/*"
+  ],
+  "exclude": [
+    "build",
+    "dist",
+  ]
+}

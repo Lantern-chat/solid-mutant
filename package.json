@@ -1,0 +1,15 @@
+{
+  "name": "solid-mutant",
+  "version": "0.1",
+  "description": "Mutant data-store for SolidJS applications ",
+  "main": "index.js",
+  "repository": "https://github.com/Lantern-chat/solid-mutant",
+  "license": "MIT",
+  "private": true,
+  "peerDependencies": {
+    "solid-js": "^1.3.10"
+  },
+  "devDependencies": {
+    "typescript": "^4.6.2"
+  }
+}
