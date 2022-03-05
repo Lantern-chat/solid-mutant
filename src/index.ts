@@ -28,6 +28,9 @@ export interface Dispatch<A extends Action, S> {
 export interface Mutator<S, A extends Action = AnyAction> {
     (state: undefined, action: A): S;
     (state: S, action: A): void | undefined;
+
+    // if created with mutatorWithDefault, this may be set.
+    default?(): S;
 }
 
 export interface Store<S = any, A extends Action = AnyAction> {
@@ -167,12 +170,16 @@ export function mutatorWithDefault<S = any, A extends Action = AnyAction>(
     default_state: () => S,
     mutator: (state: S, action: A) => void
 ) {
-    return function(state: S | undefined, action: A) {
+    function mutate(state: S | undefined, action: A) {
         let has_state = state ? 1 : (state = default_state(), 0);
         mutator(state, action);
         if(!has_state) return state;
         else return;
-    } as Mutator<S, A>;
+    }
+
+    mutate.default = default_state;
+
+    return mutate as Mutator<S, A>;
 }
 
 export interface MutantContextValue<S = any, A extends Action = AnyAction> {
