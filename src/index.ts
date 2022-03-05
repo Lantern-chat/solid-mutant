@@ -1,5 +1,5 @@
 import { createStore as createSolidStore, produce, unwrap } from "solid-js/store";
-import { Accessor, batch, createContext, createMemo, useContext } from "solid-js";
+import { Accessor, batch, createContext, createMemo, useContext, createComponent } from "solid-js";
 
 export interface Action<T = any> {
     type: T,
@@ -154,11 +154,10 @@ export interface ProviderProps<S = any, A extends Action = Action> {
 }
 
 export function Provider<S = RootStateOrAny, A extends Action = Action>(props: ProviderProps<S, A>) {
-    return (
-        <MutantContext.Provider value={{ store: props.store }}>
-            {props.children}
-        </MutantContext.Provider>
-    );
+    return createComponent(MutantContext.Provider, {
+        get value() { return { store: props.store }; },
+        get children() { return props.children; }
+    });
 }
 
 export interface DefaultRootState { };
