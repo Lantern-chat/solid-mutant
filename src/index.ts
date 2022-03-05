@@ -5,6 +5,11 @@ export interface Action<T = any> {
     type: T,
 }
 
+export interface AnyAction extends Action {
+    // Allows any extra properties to be defined in an action.
+    [extraProps: string]: any
+}
+
 export type Thunk<A extends Action, S> = (dispatch: Dispatch<A, S>, state: DeepReadonly<S>) => void;
 
 // actions, thunks and promises
@@ -20,12 +25,12 @@ export interface Dispatch<A extends Action, S> {
     <T extends A>(action: DispatchableAction<T, S>): void;
 }
 
-export interface Mutator<S, A extends Action> {
+export interface Mutator<S, A extends Action = AnyAction> {
     (state: undefined, action: A): S;
-    (state: S, action: A): void;
+    (state: S, action: A): void | undefined;
 }
 
-export interface Store<S = any, A extends Action = Action> {
+export interface Store<S = any, A extends Action = AnyAction> {
     state: DeepReadonly<S>;
     dispatch: Dispatch<A, S>;
     replaceMutator(new_mutator: Mutator<S, A>): void;
@@ -44,12 +49,18 @@ export function combineEffects<S, A extends Action>(...effects: Array<Effect<S, 
     } as Effect<S, A>;
 }
 
-export type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]> };
+declare const $CombinedState: unique symbol;
+interface EmptyObject { readonly [$CombinedState]?: undefined }
+export type CombinedState<S> = EmptyObject & S
+
+export type InitialState<S> = Required<S> extends EmptyObject
+    ? S extends CombinedState<infer S1> ? { [K in keyof S1]?: S1[K] extends object ? InitialState<S1[K]> : S1[K] } : S
+    : { [K in keyof S]: S[K] extends string | number | boolean | symbol ? S[K] : InitialState<S[K]> };
 
 const INIT: Action = { type: '@@INIT' };
-export function createStore<S = any, A extends Action = Action>(
+export function createStore<S = any, A extends Action = AnyAction>(
     mutator: Mutator<S, A>,
-    initial: DeepPartial<S> = {},
+    initial: InitialState<S>,
     effect?: Effect<S, A> | null,
 ) {
     let [state, setState] = createSolidStore<S>(initial as S, { name: 'MutantStore' }),
@@ -92,9 +103,22 @@ export function createStore<S = any, A extends Action = Action>(
     } as Store<S, A>;
 }
 
-export type MutatorMap<S, A extends Action> = {
+export type MutatorMap<S = any, A extends Action = AnyAction> = {
     [K in keyof S]: Mutator<S[K], A>
 };
+
+export type StateFromMutatorMapObject<M> = M extends MutatorMap
+    ? { [P in keyof M]: M[P] extends Mutator<infer S, any> ? S : never }
+    : never
+
+export type MutatorFromMutatorMap<M> =
+    M extends { [P in keyof M]: infer R } ? (R extends Mutator<any, any> ? R : never) : never
+
+export type ActionFromMutator<M> = M extends Mutator<any, infer A> ? A : never;
+
+export type ActionFromMutatorsMap<M> = M extends MutatorMap
+    ? ActionFromMutator<MutatorFromMutatorMap<M>>
+    : never
 
 /**
  * Combines mutators from an object key-mutator map via nesting.
@@ -102,7 +126,7 @@ export type MutatorMap<S, A extends Action> = {
  * @param mutators MutatorMap<S, A>
  * @returns Mutator<S, A>
  */
-export function combineMutators<M extends MutatorMap<S, A>, S = any, A extends Action = Action>(mutators: M) {
+export function combineMutators<M extends MutatorMap>(mutators: M) {
     let keys = Object.keys(mutators);
 
     return mutatorWithDefault(() => ({}), function(state, action) {
@@ -110,7 +134,7 @@ export function combineMutators<M extends MutatorMap<S, A>, S = any, A extends A
             let res = mutators[key](state[key], action);
             if(!!res) { state[key] = res; }
         }
-    });
+    }) as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
 }
 
 /**
@@ -119,7 +143,7 @@ export function combineMutators<M extends MutatorMap<S, A>, S = any, A extends A
  * @param mutators  MutatorMap<S, A>
  * @returns Mutator<S, A>
  */
-export function combineMutatorsFiltered<M extends MutatorMap<S, A>, S = any, A extends Action = Action>(mutators: M) {
+export function combineMutatorsFiltered<M extends MutatorMap>(mutators: M) {
     let keys = Object.keys(mutators);
 
     return mutatorWithDefault(() => ({}), function(state, action) {
@@ -129,7 +153,7 @@ export function combineMutatorsFiltered<M extends MutatorMap<S, A>, S = any, A e
             let res = mutators[key](state[key], action);
             if(!!res) { state[key] = res; }
         }
-    });
+    }) as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
 }
 
 /**
@@ -139,7 +163,7 @@ export function combineMutatorsFiltered<M extends MutatorMap<S, A>, S = any, A e
  * @param mutator (state: S, action: A) => void
  * @returns Mutator<S, A>
  */
-export function mutatorWithDefault<S = any, A extends Action = Action>(
+export function mutatorWithDefault<S = any, A extends Action = AnyAction>(
     default_state: () => S,
     mutator: (state: S, action: A) => void
 ) {
@@ -151,18 +175,18 @@ export function mutatorWithDefault<S = any, A extends Action = Action>(
     } as Mutator<S, A>;
 }
 
-export interface MutantContextValue<S = any, A extends Action = Action> {
+export interface MutantContextValue<S = any, A extends Action = AnyAction> {
     store: Store<S, A>;
 }
 
 export const MutantContext = /*#__PURE__*/ createContext<MutantContextValue>(null as any);
 
-export interface ProviderProps<S = any, A extends Action = Action> {
+export interface ProviderProps<S = any, A extends Action = AnyAction> {
     store: Store<S, A>,
     children: any,
 }
 
-export function Provider<S = RootStateOrAny, A extends Action = Action>(props: ProviderProps<S, A>) {
+export function Provider<S = RootStateOrAny, A extends Action = AnyAction>(props: ProviderProps<S, A>) {
     return createComponent(MutantContext.Provider, {
         get value() { return { store: props.store }; },
         get children() { return props.children; }
@@ -173,25 +197,25 @@ export interface DefaultRootState { };
 export type AnyIfEmpty<T extends object> = keyof T extends never ? any : T;
 export type RootStateOrAny = AnyIfEmpty<DefaultRootState>;
 
-export function useMutantContext<S = RootStateOrAny, A extends Action = Action>() {
+export function useMutantContext<S = RootStateOrAny, A extends Action = AnyAction>() {
     const contextValue = useContext(MutantContext);
 
-    if(process.env.NODE_ENV !== 'production' && !contextValue) {
-        throw new Error('could not find mutant context value; please ensure the component is wrapped in a <Provider>');
-    }
+    //if(process.env.NODE_ENV !== 'production' && !contextValue) {
+    //    throw new Error('could not find mutant context value; please ensure the component is wrapped in a <Provider>');
+    //}
 
     return contextValue as MutantContextValue<S, A>;
 }
 
-export function useStore<S = RootStateOrAny, A extends Action = Action>() {
+export function useStore<S = RootStateOrAny, A extends Action = AnyAction>() {
     return useMutantContext().store as Store<S, A>;
 }
 
-export function useDispatch<S = RootStateOrAny, A extends Action = Action>() {
+export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() {
     return useStore<S, A>().dispatch;
 }
 
-export function useSelector<T, S = RootStateOrAny, A extends Action = Action>(selector: (state: DeepReadonly<S>) => T): Accessor<T> {
+export function useSelector<T, S = RootStateOrAny, A extends Action = AnyAction>(selector: (state: DeepReadonly<S>) => T): Accessor<T> {
     const state = useStore<S, A>().state;
     return createMemo(() => selector(state));
 }
