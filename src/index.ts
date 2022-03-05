@@ -44,21 +44,21 @@ export function combineEffects<S, A extends Action>(...effects: Array<Effect<S, 
     } as Effect<S, A>;
 }
 
+export type DeepPartial<T> = { [P in keyof T]?: DeepPartial<T[P]> };
+
 const INIT: Action = { type: '@@INIT' };
 export function createStore<S = any, A extends Action = Action>(
     mutator: Mutator<S, A>,
-    initial?: S,
+    initial: DeepPartial<S> = {},
     effect?: Effect<S, A> | null,
 ) {
-    let [state, setState] = createSolidStore<S>(initial || mutator(void 0, INIT as A), { name: 'MutantStore' }),
+    let [state, setState] = createSolidStore<S>(initial as S, { name: 'MutantStore' }),
         mutate = (action: A) => setState(produce(s => mutator(s as any, action))),
         run: (action: A) => void;
 
     function replaceEffect(effect: Effect<S, A> | null | undefined) {
         run = effect ? (action: A) => { mutate(action); effect(unwrap(state), action, dispatch) } : mutate;
     }
-
-    replaceEffect(effect);
 
     function dispatch(action: DispatchableAction<A, S>) {
         // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
@@ -77,6 +77,9 @@ export function createStore<S = any, A extends Action = Action>(
             }
         });
     };
+
+    replaceEffect(effect);
+    dispatch(INIT as A);
 
     return {
         state,
