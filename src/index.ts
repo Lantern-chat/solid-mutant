@@ -5,8 +5,7 @@ export interface Action<T = any> {
     type: T,
 }
 
-export type Thunk<A extends Action, S> =
-    ((dispatch: Dispatch<A, S>, state: DeepReadonly<S>) => void);
+export type Thunk<A extends Action, S> = (dispatch: Dispatch<A, S>, state: DeepReadonly<S>) => void;
 
 // actions, thunks and promises
 export type DispatchableAction<A extends Action, S> =
@@ -30,6 +29,7 @@ export interface Store<S = any, A extends Action = Action> {
     state: DeepReadonly<S>;
     dispatch: Dispatch<A, S>;
     replaceMutator(new_mutator: Mutator<S, A>): void;
+    replaceEffect(new_effect: Effect<S, A> | null | undefined): void;
 }
 
 export interface Effect<S, A extends Action> {
@@ -48,12 +48,17 @@ const INIT: Action = { type: '@@INIT' };
 export function createStore<S = any, A extends Action = Action>(
     mutator: Mutator<S, A>,
     initial?: S,
-    effect?: Effect<S, A>,
+    effect?: Effect<S, A> | null,
 ) {
-    let [state, setState] = createSolidStore<S>(initial || mutator(void 0, INIT as A), { name: 'MutantStore' });
+    let [state, setState] = createSolidStore<S>(initial || mutator(void 0, INIT as A), { name: 'MutantStore' }),
+        mutate = (action: A) => setState(produce(s => mutator(s as any, action))),
+        run: (action: A) => void;
 
-    let mutate = (action: A) => setState(produce(s => mutator(s as any, action))),
+    function replaceEffect(effect: Effect<S, A> | null | undefined) {
         run = effect ? (action: A) => { mutate(action); effect(unwrap(state), action, dispatch) } : mutate;
+    }
+
+    replaceEffect(effect);
 
     function dispatch(action: DispatchableAction<A, S>) {
         // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
@@ -75,11 +80,12 @@ export function createStore<S = any, A extends Action = Action>(
 
     return {
         state,
+        dispatch,
+        replaceEffect,
         replaceMutator(new_mutator: Mutator<S, A>) {
             mutator = new_mutator;
             dispatch(INIT as A); // rerun init to refresh changed mutators
         },
-        dispatch,
     } as Store<S, A>;
 }
 
