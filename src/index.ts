@@ -28,9 +28,6 @@ export interface Dispatch<A extends Action, S> {
 export interface Mutator<S, A extends Action = AnyAction> {
     (state: undefined, action: A): S;
     (state: S, action: A): void | undefined;
-
-    // if created with mutatorWithDefault, this may be set.
-    default?(): S;
 }
 
 export interface Store<S = any, A extends Action = AnyAction> {
@@ -137,7 +134,7 @@ export function combineMutators<M extends MutatorMap>(mutators: M) {
             let res = mutators[key](state[key], action);
             if(!!res) { state[key] = res; }
         }
-    }) as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
+    }) as unknown as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
 }
 
 /**
@@ -156,7 +153,11 @@ export function combineMutatorsFiltered<M extends MutatorMap>(mutators: M) {
             let res = mutators[key](state[key], action);
             if(!!res) { state[key] = res; }
         }
-    }) as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
+    }) as unknown as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
+}
+
+export interface MutatorWithDefault<S, A extends Action> extends Mutator<S, A> {
+    default(): S;
 }
 
 /**
@@ -179,7 +180,7 @@ export function mutatorWithDefault<S = any, A extends Action = AnyAction>(
 
     mutate.default = default_state;
 
-    return mutate as Mutator<S, A>;
+    return mutate as MutatorWithDefault<S, A>;
 }
 
 export interface MutantContextValue<S = any, A extends Action = AnyAction> {
