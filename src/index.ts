@@ -200,9 +200,9 @@ export type RootStateOrAny = AnyIfEmpty<DefaultRootState>;
 export function useMutantContext<S = RootStateOrAny, A extends Action = AnyAction>() {
     const contextValue = useContext(MutantContext);
 
-    //if(process.env.NODE_ENV !== 'production' && !contextValue) {
-    //    throw new Error('could not find mutant context value; please ensure the component is wrapped in a <Provider>');
-    //}
+    if(process.env.NODE_ENV !== 'production' && !contextValue) {
+        throw new Error('could not find mutant context value; please ensure the component is wrapped in a <Provider>');
+    }
 
     return contextValue as MutantContextValue<S, A>;
 }
