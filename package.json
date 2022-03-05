@@ -1,6 +1,6 @@
 {
   "name": "solid-mutant",
-  "version": "0.1",
+  "version": "0.1.0",
   "description": "Mutant data-store for SolidJS applications ",
   "main": "index.js",
   "repository": "https://github.com/Lantern-chat/solid-mutant",
