@@ -223,9 +223,27 @@ export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() 
     return useStore<S, A>().dispatch;
 }
 
-export type Selector<S, T> = (state: DeepReadonly<S>) => T;
+export type Selector<S, T = unknown> = (state: S) => T;
 
-export function useSelector<T, S = RootStateOrAny, A extends Action = AnyAction>(selector: Selector<S, T>): Accessor<T> {
-    const state = useStore<S, A>().state;
+export function useSelector<S = RootStateOrAny, T = unknown>(selector: Selector<DeepReadonly<S>, T>): Accessor<T> {
+    const state = useStore<S>().state;
     return createMemo(() => selector(state));
+}
+
+export type StructuredSelectorMap<S = RootStateOrAny> = {
+    [key: keyof any]: Selector<DeepReadonly<S>>;
+};
+
+export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) => { [P in keyof M]: Accessor<ReturnType<M[P]>> };
+export function useStructuredSelector<M extends StructuredSelectorMap>(map: M): { [P in keyof M]: Accessor<ReturnType<M[P]>> };
+export function useStructuredSelector(map?: any): any {
+    let use = (map: any) => {
+        let state = useStore().state, res = {} as any;
+        for(let key in map) {
+            let cb = map[key]; res[key] = createMemo(() => cb(state));
+        }
+        return res;
+    };
+
+    return map ? use(map) : use;
 }
