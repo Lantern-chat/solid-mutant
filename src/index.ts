@@ -223,7 +223,9 @@ export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() 
     return useStore<S, A>().dispatch;
 }
 
-export function useSelector<T, S = RootStateOrAny, A extends Action = AnyAction>(selector: (state: DeepReadonly<S>) => T): Accessor<T> {
+export type Selector<S, T> = (state: DeepReadonly<S>) => T;
+
+export function useSelector<T, S = RootStateOrAny, A extends Action = AnyAction>(selector: Selector<S, T>): Accessor<T> {
     const state = useStore<S, A>().state;
     return createMemo(() => selector(state));
 }
