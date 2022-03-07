@@ -126,7 +126,9 @@ export type ActionFromMutatorsMap<M> = M extends MutatorMap
  * @param mutators MutatorMap<S, A>
  * @returns Mutator<S, A>
  */
-export function combineMutators<M extends MutatorMap>(mutators: M) {
+export function combineMutators<S, A extends Action = AnyAction>(mutators: MutatorMap<S, A>):
+    Mutator<CombinedState<S>, Action>;
+export function combineMutators<M extends MutatorMap>(mutators: M): Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>> {
     let keys = Object.keys(mutators);
 
     return mutatorWithDefault(() => ({}), function(state, action) {
@@ -134,7 +136,7 @@ export function combineMutators<M extends MutatorMap>(mutators: M) {
             let res = mutators[key](state[key], action);
             if(!!res) { state[key] = res; }
         }
-    }) as unknown as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
+    }) as any;
 }
 
 /**
