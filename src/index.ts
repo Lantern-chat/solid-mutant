@@ -349,11 +349,15 @@ export type Access<S> = S extends Accessor<infer R> ?
     Access<R> : (S extends {} | [] ? { [K in keyof S]: Access<S[K]> } : S);
 
 /**
- * Accesses all Accessor functions within a nested memoized selector result
+ * Accesses all Accessor functions within a nested memoized selector result.
+ *
+ * In general, don't use this, unless you want to use a composite selector outside of the UI
+ * and don't want to manually access every sub-property.
+ *
  * @param state S
  * @returns Access<S>
  */
-export function accessAll<S>(state: S): Access<S> {
+export function access<S>(state: S): Access<S> {
     // unwrap
     if(typeof state === 'function') {
         state = state();
@@ -362,11 +366,11 @@ export function accessAll<S>(state: S): Access<S> {
     // recurse
     if(typeof state === 'object') {
         if(Array.isArray(state)) {
-            state = state.map(accessAll) as any;
+            state = state.map(access) as any;
         } else {
             let res = {} as any;
             for(let key in state) {
-                res[key] = accessAll(state[key]);
+                res[key] = access(state[key]);
             }
             state = res;
         }
