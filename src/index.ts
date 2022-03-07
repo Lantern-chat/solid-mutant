@@ -258,11 +258,11 @@ export function useStructuredSelector(map?: any): any {
  * Create a reusable structured-selector
  */
 export function createStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) =>
-    Selector<S, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
+    Selector<DeepReadonly<S>, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
 export function createStructuredSelector<M extends StructuredSelectorMap>(map: M):
-    Selector<M extends StructuredSelectorMap<infer S> ? S : never, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
+    Selector<M extends StructuredSelectorMap<infer S> ? DeepReadonly<S> : never, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
 export function createStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<DeepReadonly<S>, Result[K]> }):
-    Selector<S, { [K in keyof Result]: Accessor<Result[K]> }>
+    Selector<DeepReadonly<S>, { [K in keyof Result]: Accessor<Result[K]> }>
 export function createStructuredSelector(map?: any): any {
     let create = (map: any) => (state: any) => {
         let res = {} as any;
