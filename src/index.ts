@@ -1,5 +1,5 @@
 import { createStore as createSolidStore, produce, unwrap } from "solid-js/store";
-import { Accessor, batch, createContext, createMemo, useContext, createComponent, untrack } from "solid-js";
+import { Accessor, batch, createContext, createMemo, useContext, createComponent } from "solid-js";
 
 export interface Action<T = any> {
     type: T,
@@ -76,7 +76,7 @@ export function createStore<S = any, A extends Action = AnyAction>(
     };
 
     let replaceEffect = (effect: Effect<S, A> | null | undefined) => {
-        run = effect ? (action: A) => { mutate(action); untrack(() => effect(state, action, dispatch)) } : mutate;
+        run = effect ? (action: A) => { mutate(action); effect(unwrap(state), action, dispatch) } : mutate;
     };
 
     let dispatch = (action: DispatchableAction<A, S>) => {
