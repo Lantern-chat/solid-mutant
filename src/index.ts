@@ -238,7 +238,10 @@ export type StructuredSelectorMap<S = RootStateOrAny> = {
  * Create structured-selector in-place using the current store
  */
 export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) => { [P in keyof M]: Accessor<ReturnType<M[P]>> };
-export function useStructuredSelector<M extends StructuredSelectorMap>(map: M): { [P in keyof M]: Accessor<ReturnType<M[P]>> };
+export function useStructuredSelector<M extends StructuredSelectorMap>(map: M):
+    { [P in keyof M]: Accessor<ReturnType<M[P]>> };
+export function useStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<S, Result[K]> }):
+    { [P in keyof Result]: Accessor<Result[P]> };
 export function useStructuredSelector(map?: any): any {
     let use = (map: any) => {
         let state = useStore().state, res = {} as any;
@@ -258,6 +261,8 @@ export function createStructuredSelector<S>(): <M extends StructuredSelectorMap<
     Selector<S, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
 export function createStructuredSelector<M extends StructuredSelectorMap>(map: M):
     Selector<M extends StructuredSelectorMap<infer S> ? S : never, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
+export function createStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<S, Result[K]> }):
+    Selector<S, { [K in keyof Result]: Accessor<Result[K]> }>
 export function createStructuredSelector(map?: any): any {
     let create = (map: any) => (state: any) => {
         let res = {} as any;
