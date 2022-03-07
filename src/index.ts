@@ -96,7 +96,7 @@ export function createStore<S = any, A extends Action = AnyAction>(
                 (action as Promise<DispatchableAction<A, S>>).then(dispatch);
             } else if(typeof action === 'function') {
                 // thunks
-                action(dispatch, state);
+                action(dispatch, unwrap(state));
             }
         });
     };
