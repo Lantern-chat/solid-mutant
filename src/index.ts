@@ -275,3 +275,59 @@ export function createStructuredSelector(map?: any): any {
 
     return map ? create(map) : create;
 }
+
+export type SelectorArray<S = RootStateOrAny> = ReadonlyArray<Selector<DeepReadonly<S>>>;
+
+export type SignalReturnType<T extends ReadonlyArray<Selector<DeepReadonly<S>>>, S = RootStateOrAny> = {
+    [index in keyof T]: T[index] extends T[number] ? Accessor<ReturnType<T[index]>> : never
+}
+
+export function collectSelectors<S>():
+    <Selectors extends SelectorArray<S>>(...selectors: Selectors) => Selector<DeepReadonly<S>, SignalReturnType<Selectors, S>>;
+export function collectSelectors<Selectors extends SelectorArray>(...selectors: Selectors):
+    Selector<Selectors extends SelectorArray<infer S> ? DeepReadonly<S> : never, SignalReturnType<Selectors>>;
+
+export function collectSelectors(...selectors: any[]): any {
+    let collect = (...selectors: any[]) => (state: any) => {
+        return selectors.map(s => createMemo(() => s(state)));
+    };
+
+    return selectors.length ? collect(...selectors) : collect;
+}
+
+// TODO: Figure out how to get these signatures to work...
+// export function composeSelectors<S>(): <Selectors extends SelectorArray<S>, Result>(...items: [
+// ...Selectors,
+// (...signals: SignalReturnType<Selectors, S>) => Result
+// ]) => Selector<DeepReadonly<S>, Result>;
+// export function composeSelectors<Selectors extends SelectorArray, Result>(...items: [
+// ...Selectors,
+// (...signals: SignalReturnType<Selectors>) => Result
+// ]): Selector<Selectors extends SelectorArray<infer S> ? DeepReadonly<S> : never, Result>;
+
+
+export function composeSelectors<S>(): <Selectors extends SelectorArray<S>, Result>(
+    selectors: [...Selectors],
+    combiner: (...signals: SignalReturnType<Selectors, S>) => Result
+) => Selector<DeepReadonly<S>, Result>;
+
+export function composeSelectors<Selectors extends SelectorArray, Result>(
+    selectors: [...Selectors],
+    combiner: (...signals: SignalReturnType<Selectors>) => Result
+): Selector<Selectors extends SelectorArray<infer S> ? DeepReadonly<S> : never, Result>;
+
+export function composeSelectors(...items: any[]): any {
+    let compose = (...items: any[]) => {
+        let combiner = items.pop();
+        if(items.length == 1 && Array.isArray(items[0])) {
+            items = items[0];
+        }
+
+        return function(state: any) {
+            return combiner(...items.map(s => createMemo(() => s(state))));
+        };
+    };
+
+    return items.length ? compose(...items) : compose;
+}
+
