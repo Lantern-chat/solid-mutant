@@ -38,13 +38,13 @@ export interface Store<S = any, A extends Action = AnyAction> {
 }
 
 export interface Effect<S, A extends Action> {
-    (state: DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>): void;
+    (getState: () => DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>): void;
 }
 
 export function combineEffects<S, A extends Action>(...effects: Array<Effect<S, A>>) {
-    return function(state: DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>) {
+    return function(getState: () => DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>) {
         for(let effect of effects) {
-            effect(state, action, dispatch);
+            effect(getState, action, dispatch);
         }
     } as Effect<S, A>;
 }
@@ -64,11 +64,20 @@ export function createStore<S = any, A extends Action = AnyAction>(
     effect?: Effect<S, A> | null,
 ) {
     let [state, setState] = createSolidStore<S>(initial as S, { name: 'MutantStore' }),
-        mutate = (action: A) => setState(produce(s => mutator(s as any, action))),
-        run: (action: A) => void;
+        mutate = (action: A) => { setState(produce(s => mutator(s as any, action))); dirty = 1; },
+        run: (action: A) => void, dirty = 1, cached: S;
+
+    // to avoid re-unwrapping the state within an effect, cache it
+    let getState = (): DeepReadonly<S> => {
+        if(dirty) {
+            cached = unwrap(state);
+            dirty = 0;
+        }
+        return cached;
+    };
 
     function replaceEffect(effect: Effect<S, A> | null | undefined) {
-        run = effect ? (action: A) => { mutate(action); effect(unwrap(state), action, dispatch) } : mutate;
+        run = effect ? (action: A) => { mutate(action); effect(getState, action, dispatch) } : mutate;
     }
 
     function dispatch(action: DispatchableAction<A, S>) {
