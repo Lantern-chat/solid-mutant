@@ -75,11 +75,11 @@ export function createStore<S = any, A extends Action = AnyAction>(
         }
     };
 
-    function replaceEffect(effect: Effect<S, A> | null | undefined) {
+    let replaceEffect = (effect: Effect<S, A> | null | undefined) => {
         run = effect ? (action: A) => { mutate(action); untrack(() => effect(state, action, dispatch)) } : mutate;
-    }
+    };
 
-    function dispatch(action: DispatchableAction<A, S>) {
+    let dispatch = (action: DispatchableAction<A, S>) => {
         if(is_dispatching) {
             throw new Error("Mutators may not dispatch actions.");
         }
