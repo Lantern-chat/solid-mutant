@@ -1,5 +1,5 @@
 import { createStore as createSolidStore, produce, unwrap } from "solid-js/store";
-import { Accessor, batch, createContext, createMemo, useContext, createComponent } from "solid-js";
+import { Accessor, batch, createContext, createMemo, useContext, createComponent, untrack } from "solid-js";
 
 export interface Action<T = any> {
     type: T,
@@ -38,13 +38,13 @@ export interface Store<S = any, A extends Action = AnyAction> {
 }
 
 export interface Effect<S, A extends Action> {
-    (getState: () => DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>): void;
+    (state: DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>): void;
 }
 
 export function combineEffects<S, A extends Action>(...effects: Array<Effect<S, A>>) {
-    return function(getState: () => DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>) {
+    return function(state: DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>) {
         for(let effect of effects) {
-            effect(getState, action, dispatch);
+            effect(state, action, dispatch);
         }
     } as Effect<S, A>;
 }
@@ -64,23 +64,26 @@ export function createStore<S = any, A extends Action = AnyAction>(
     effect?: Effect<S, A> | null,
 ) {
     let [state, setState] = createSolidStore<S>(initial as S, { name: 'MutantStore' }),
-        mutate = (action: A) => { setState(produce(s => mutator(s as any, action))); dirty = 1; },
-        run: (action: A) => void, dirty = 1, cached: S;
+        run: (action: A) => void, is_dispatching: 0 | 1 = 0;
 
-    // to avoid re-unwrapping the state within an effect, cache it
-    let getState = (): DeepReadonly<S> => {
-        if(dirty) {
-            cached = unwrap(state);
-            dirty = 0;
+    let mutate = (action: A) => {
+        try {
+            is_dispatching = 1;
+            setState(produce(s => mutator(s as any, action)));
+        } finally {
+            is_dispatching = 0;
         }
-        return cached;
     };
 
     function replaceEffect(effect: Effect<S, A> | null | undefined) {
-        run = effect ? (action: A) => { mutate(action); effect(getState, action, dispatch) } : mutate;
+        run = effect ? (action: A) => { mutate(action); untrack(() => effect(state, action, dispatch)) } : mutate;
     }
 
     function dispatch(action: DispatchableAction<A, S>) {
+        if(is_dispatching) {
+            throw new Error("Mutators may not dispatch actions.");
+        }
+
         // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
         if(action) batch(() => {
             if(typeof action === 'object' && !!(action as A).type) {
