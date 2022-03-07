@@ -331,3 +331,32 @@ export function composeSelectors(...items: any[]): any {
     return items.length ? compose(...items) : compose;
 }
 
+export type Access<S> = S extends Accessor<infer R> ?
+    Access<R> : (S extends {} | [] ? { [K in keyof S]: Access<S[K]> } : S);
+
+/**
+ * Accesses all Accessor functions within a nested memoized selector result
+ * @param state S
+ * @returns Access<S>
+ */
+export function accessAll<S>(state: S): Access<S> {
+    // unwrap
+    if(typeof state === 'function') {
+        state = state();
+    }
+
+    // recurse
+    if(typeof state === 'object') {
+        if(Array.isArray(state)) {
+            state = state.map(accessAll) as any;
+        } else {
+            let res = {} as any;
+            for(let key in state) {
+                res[key] = accessAll(state[key]);
+            }
+            state = res;
+        }
+    }
+
+    return state as Access<S>;
+}
