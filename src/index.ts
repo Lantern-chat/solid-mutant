@@ -239,9 +239,16 @@ export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() 
 
 export type Selector<S, T = unknown> = (state: S) => T;
 
-export function useSelector<S = RootStateOrAny, T = unknown>(selector: Selector<DeepReadonly<S>, T>): Accessor<T> {
+export function useSelector<S = {}, T = unknown>(
+    selector: Selector<DeepReadonly<S>, T>,
+    equals?: (a: T, b: T) => boolean,
+): Accessor<T> {
     const state = useStore<S>().state;
-    return createMemo(() => selector(state));
+    return createMemo(() => selector(state), { equals });
+}
+
+export interface TypedUseSelectorHook<S> {
+    <T>(selector: Selector<DeepReadonly<S>, T>, equals?: (a: T, b: T) => boolean): Accessor<T>
 }
 
 export type StructuredSelectorMap<S = RootStateOrAny> = {
