@@ -237,32 +237,33 @@ export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() 
     return useStore<S, A>().dispatch;
 }
 
-export type Selector<S, T = unknown> = (state: S) => T;
+export type Selector<S, T = unknown> = (state: DeepReadonly<S>) => DeepReadonly<T>;
 
 export function useSelector<S = {}, T = unknown>(
-    selector: Selector<DeepReadonly<S>, T>,
+    selector: Selector<S, T>,
     equals?: (a: T, b: T) => boolean,
-): Accessor<T> {
+): Accessor<DeepReadonly<T>> {
     const state = useStore<S>().state;
     return createMemo(() => selector(state), { equals });
 }
 
 export interface TypedUseSelectorHook<S> {
-    <T>(selector: Selector<DeepReadonly<S>, T>, equals?: (a: T, b: T) => boolean): Accessor<T>
+    <T>(selector: Selector<S, T>, equals?: (a: T, b: T) => boolean): Accessor<T>
 }
 
 export type StructuredSelectorMap<S = RootStateOrAny> = {
-    [key: keyof any]: Selector<DeepReadonly<S>>;
+    [key: keyof any]: Selector<S>;
 };
 
 /**
  * Create structured-selector in-place using the current store
  */
-export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) => { readonly [P in keyof M]: ReturnType<M[P]> };
+export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) =>
+    DeepReadonly<{ [P in keyof M]: ReturnType<M[P]> }>;
 export function useStructuredSelector<M extends StructuredSelectorMap>(map: M):
-    { readonly [P in keyof M]: ReturnType<M[P]> };
-export function useStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<DeepReadonly<S>, Result[K]> }):
-    { readonly [P in keyof Result]: Result[P] };
+    DeepReadonly<{ [P in keyof M]: ReturnType<M[P]> }>;
+export function useStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<S, Result[K]> }):
+    DeepReadonly<{ [P in keyof Result]: Result[P] }>;
 export function useStructuredSelector(map?: any): any {
     return useSelector(createStructuredSelector(map))();
 }
@@ -271,11 +272,11 @@ export function useStructuredSelector(map?: any): any {
  * Create a reusable structured-selector
  */
 export function createStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) =>
-    Selector<DeepReadonly<S>, { readonly [P in keyof M]: ReturnType<M[P]> }>;
+    Selector<S, { [P in keyof M]: ReturnType<M[P]> }>;
 export function createStructuredSelector<M extends StructuredSelectorMap>(map: M):
-    Selector<M extends StructuredSelectorMap<infer S> ? DeepReadonly<S> : never, { readonly [P in keyof M]: ReturnType<M[P]> }>;
-export function createStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<DeepReadonly<S>, Result[K]> }):
-    Selector<DeepReadonly<S>, { readonly [K in keyof Result]: Result[K] }>
+    Selector<M extends StructuredSelectorMap<infer S> ? S : never, { [P in keyof M]: ReturnType<M[P]> }>;
+export function createStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<S, Result[K]> }):
+    Selector<S, { [K in keyof Result]: Result[K] }>
 export function createStructuredSelector(map?: any): any {
     let create = (map: any) => (state: any) => {
         let res = {} as any;
@@ -292,16 +293,16 @@ export function createStructuredSelector(map?: any): any {
     return map ? create(map) : create;
 }
 
-export type SelectorArray<S = RootStateOrAny> = ReadonlyArray<Selector<DeepReadonly<S>>>;
+export type SelectorArray<S = RootStateOrAny> = ReadonlyArray<Selector<S>>;
 
-export type SignalReturnType<T extends ReadonlyArray<Selector<DeepReadonly<S>>>, S = RootStateOrAny> = {
+export type SignalReturnType<T extends ReadonlyArray<Selector<S>>, S = RootStateOrAny> = {
     [index in keyof T]: T[index] extends T[number] ? Accessor<ReturnType<T[index]>> : never
 }
 
 export function collectSelectors<S>():
-    <Selectors extends SelectorArray<S>>(...selectors: Selectors) => Selector<DeepReadonly<S>, SignalReturnType<Selectors, S>>;
+    <Selectors extends SelectorArray<S>>(...selectors: Selectors) => Selector<S, SignalReturnType<Selectors, S>>;
 export function collectSelectors<Selectors extends SelectorArray>(...selectors: Selectors):
-    Selector<Selectors extends SelectorArray<infer S> ? DeepReadonly<S> : never, SignalReturnType<Selectors>>;
+    Selector<Selectors extends SelectorArray<infer S> ? S : never, SignalReturnType<Selectors>>;
 
 export function collectSelectors(...selectors: any[]): any {
     let collect = (...selectors: any[]) => (state: any) => {
@@ -315,22 +316,22 @@ export function collectSelectors(...selectors: any[]): any {
 // export function composeSelectors<S>(): <Selectors extends SelectorArray<S>, Result>(...items: [
 // ...Selectors,
 // (...signals: SignalReturnType<Selectors, S>) => Result
-// ]) => Selector<DeepReadonly<S>, Result>;
+// ]) => Selector<S, Result>;
 // export function composeSelectors<Selectors extends SelectorArray, Result>(...items: [
 // ...Selectors,
 // (...signals: SignalReturnType<Selectors>) => Result
-// ]): Selector<Selectors extends SelectorArray<infer S> ? DeepReadonly<S> : never, Result>;
+// ]): Selector<Selectors extends SelectorArray<infer S> ? S : never, Result>;
 
 
 export function composeSelectors<S>(): <Selectors extends SelectorArray<S>, Result>(
     selectors: [...Selectors],
     combiner: (...signals: SignalReturnType<Selectors, S>) => Result
-) => Selector<DeepReadonly<S>, Result>;
+) => Selector<S, Result>;
 
 export function composeSelectors<Selectors extends SelectorArray, Result>(
     selectors: [...Selectors],
     combiner: (...signals: SignalReturnType<Selectors>) => Result
-): Selector<Selectors extends SelectorArray<infer S> ? DeepReadonly<S> : never, Result>;
+): Selector<Selectors extends SelectorArray<infer S> ? S : never, Result>;
 
 export function composeSelectors(...items: any[]): any {
     let compose = (...items: any[]) => {
