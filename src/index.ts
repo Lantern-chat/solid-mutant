@@ -258,38 +258,33 @@ export type StructuredSelectorMap<S = RootStateOrAny> = {
 /**
  * Create structured-selector in-place using the current store
  */
-export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) => { [P in keyof M]: Accessor<ReturnType<M[P]>> };
+export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) => { readonly [P in keyof M]: ReturnType<M[P]> };
 export function useStructuredSelector<M extends StructuredSelectorMap>(map: M):
-    { [P in keyof M]: Accessor<ReturnType<M[P]>> };
+    { readonly [P in keyof M]: ReturnType<M[P]> };
 export function useStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<DeepReadonly<S>, Result[K]> }):
-    { [P in keyof Result]: Accessor<Result[P]> };
+    { readonly [P in keyof Result]: Result[P] };
 export function useStructuredSelector(map?: any): any {
-    let use = (map: any) => {
-        let state = useStore().state, res = {} as any;
-        for(let key in map) {
-            let cb = map[key]; res[key] = createMemo(() => cb(state));
-        }
-        return res;
-    };
-
-    return map ? use(map) : use;
+    return useSelector(createStructuredSelector(map))();
 }
 
 /**
  * Create a reusable structured-selector
  */
 export function createStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) =>
-    Selector<DeepReadonly<S>, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
+    Selector<DeepReadonly<S>, { readonly [P in keyof M]: ReturnType<M[P]> }>;
 export function createStructuredSelector<M extends StructuredSelectorMap>(map: M):
-    Selector<M extends StructuredSelectorMap<infer S> ? DeepReadonly<S> : never, { [P in keyof M]: Accessor<ReturnType<M[P]>> }>;
+    Selector<M extends StructuredSelectorMap<infer S> ? DeepReadonly<S> : never, { readonly [P in keyof M]: ReturnType<M[P]> }>;
 export function createStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<DeepReadonly<S>, Result[K]> }):
-    Selector<DeepReadonly<S>, { [K in keyof Result]: Accessor<Result[K]> }>
+    Selector<DeepReadonly<S>, { readonly [K in keyof Result]: Result[K] }>
 export function createStructuredSelector(map?: any): any {
     let create = (map: any) => (state: any) => {
         let res = {} as any;
         for(let key in map) {
             let cb = map[key];
-            res[key] = createMemo(() => cb(state))
+            Object.defineProperty(res, key, {
+                get: createMemo(() => cb(state)),
+                enumerable: true,
+            });
         }
         return res;
     };
