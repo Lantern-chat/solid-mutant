@@ -64,14 +64,14 @@ export function createStore<S = any, A extends Action = AnyAction>(
     effect?: Effect<S, A> | null,
 ) {
     let [state, setState] = createSolidStore<S>(initial as S, { name: 'MutantStore' }),
-        run: (action: A) => void, is_dispatching: 0 | 1 = 0;
+        run: (action: A) => void, is_mutating: 0 | 1 = 0;
 
     let mutate = (action: A) => {
         try {
-            is_dispatching = 1;
+            is_mutating = 1;
             setState(produce(s => mutator(s as any, action)));
         } finally {
-            is_dispatching = 0;
+            is_mutating = 0;
         }
     };
 
@@ -80,7 +80,7 @@ export function createStore<S = any, A extends Action = AnyAction>(
     };
 
     let dispatch = (action: DispatchableAction<A, S>) => {
-        if(is_dispatching) {
+        if(is_mutating) {
             throw new Error("Mutators may not dispatch actions.");
         }
 
