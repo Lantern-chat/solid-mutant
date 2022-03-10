@@ -1,5 +1,5 @@
 import { createStore as createSolidStore, produce, unwrap } from "solid-js/store";
-import { Accessor, batch, createContext, createMemo, useContext, createComponent } from "solid-js";
+import { Accessor, batch, createContext, createMemo, useContext, createComponent, untrack } from "solid-js";
 
 export interface Action<T = any> {
     type: T,
@@ -87,7 +87,8 @@ export function createStore<S = any, A extends Action = AnyAction>(
         // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
         if(action) batch(() => {
             if(typeof action === 'object' && !!(action as A).type) {
-                run(action as A);
+                // untrack so if the action somehow has references to external state, do nothing
+                untrack(() => run(action as A));
             } else if(Array.isArray(action)) {
                 // arrays
                 action.forEach(dispatch);
@@ -95,8 +96,8 @@ export function createStore<S = any, A extends Action = AnyAction>(
                 // promises
                 (action as Promise<DispatchableAction<A, S>>).then(dispatch);
             } else if(typeof action === 'function') {
-                // thunks
-                action(dispatch, unwrap(state));
+                // thunks, don't track deps within execution
+                untrack(() => action(dispatch, unwrap(state)));
             }
         });
     };
