@@ -19,7 +19,7 @@ export type DispatchableAction<A extends Action, S> =
     | Array<DispatchableAction<A, S>>
     | Promise<DispatchableAction<A, S>>;
 
-export type DeepReadonly<T> = { readonly [K in keyof T]: DeepReadonly<T[K]> }
+export type DeepReadonly<T> = T extends {} ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
 
 export interface Dispatch<A extends Action, S> {
     <T extends A>(action: DispatchableAction<T, S>): void;
