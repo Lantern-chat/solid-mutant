@@ -131,10 +131,12 @@ function App() {
 Then deeper in:
 ```jsx
 function SomeComponent() {
-    let store = useStore();
+    let store = useStore(), dispatch = useDispatch();
 
     return (
-        <div>{store.state.value}</div>
+        <button type="button" onClick={() => dispatch({type: 'increment'})}>
+            {store.state.value}
+        </button>
     )
 }
 ```
