@@ -1,4 +1,4 @@
-import { createStore as createSolidStore, produce, unwrap } from "solid-js/store";
+import { createStore, produce, unwrap } from "solid-js/store";
 import { Accessor, batch, createContext, createMemo, useContext, createComponent, untrack } from "solid-js";
 
 export interface Action<T = any> {
@@ -58,12 +58,12 @@ export type InitialState<S> = Required<S> extends EmptyObject
     : { [K in keyof S]: S[K] extends string | number | boolean | symbol ? S[K] : InitialState<S[K]> };
 
 const INIT: Action = { type: '@@INIT' };
-export function createStore<S = any, A extends Action = AnyAction>(
+export function createMutantStore<S = any, A extends Action = AnyAction>(
     mutator: Mutator<S, A>,
     initial: InitialState<S>,
     effect?: Effect<S, A> | null,
 ) {
-    let [state, setState] = createSolidStore<S>(initial as S, { name: 'MutantStore' }),
+    let [state, setState] = createStore<S>(initial as S, { name: 'MutantStore' }),
         run: (action: A) => void, is_mutating: 0 | 1 = 0;
 
     let mutate = (action: A) => {

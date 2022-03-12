@@ -40,7 +40,7 @@ function mutator(state, action) {
     }
 }
 
-let store = createStore(mutator, { value: 0 });
+let store = createMutantStore(mutator, { value: 0 });
 
 store.dispatch({type: 'increment'});
 
@@ -80,7 +80,7 @@ const root_mutator = combineMutators({
     cart: cart_mutator,
 });
 
-const store = createStore(root_mutator, {}); // state will be filled in with defaults
+const store = createMutantStore(root_mutator, {}); // state will be filled in with defaults
 
 console.log(store.state.cart); // ...
 ```
@@ -89,7 +89,7 @@ console.log(store.state.cart); // ...
 
 After Dispatching an action, it's often desired to be able to perform side-effects. Side-effects are best to be avoided in mutators themselves.
 
-To provide this, `createStore` takes a third argument that is simply a function to perform untracked side-effects.
+To provide this, `createMutantStore` takes a third argument that is simply a function to perform untracked side-effects.
 
 ```js
 function some_effect(state, action, dispatch) {
@@ -99,7 +99,7 @@ function some_effect(state, action, dispatch) {
     }
 }
 
-const store = createStore(mutator, {value: 0}, some_effect);
+const store = createMutantStore(mutator, {value: 0}, some_effect);
 ```
 
 ### Patching mutators and effects
@@ -115,9 +115,9 @@ Mutant provides a few functions to insert the Store into your component tree, an
 The `Provider` component is a thin wrapper for a context provider, such that:
 
 ```jsx
-import { createStore, Provider } from "solid-mutant";
+import { createMutantStore, Provider } from "solid-mutant";
 
-const store = createStore(...);
+const store = createMutantStore(...);
 
 function App() {
     return (
@@ -169,8 +169,8 @@ The downside of this is that it uses a custom getter that ties into the state.
 
 To use the result of this structured selector as a regular object, splat it like:
 ```js
-import { createStore as createSolidStore }
-let [local, setLocal] = createSolidStore({ ...stuff });
+import { createStore } from "solid-js/store";
+let [local, setLocal] = createStore({ ...stuff });
 ```
 
 A `createStructuredSelector` method exists as well for re-usable structured selectors.
