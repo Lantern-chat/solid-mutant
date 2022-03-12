@@ -53,7 +53,7 @@ To make this easier, the `mutatorWithDefault` method is provided:
 
 ```js
 const mutator = mutatorWithDefault(
-    () => ({value: 0}), // not this is a closure, so a new object is generated
+    () => ({value: 0}), // note this is a closure, so a new object is generated
     (state, action) => {
         switch(action.type) {
             case 'increment': {
