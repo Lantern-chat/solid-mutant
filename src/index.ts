@@ -85,10 +85,9 @@ export function createMutantStore<S = any, A extends Action = AnyAction>(
         }
 
         // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
-        if(action) batch(() => {
+        if(action) batch(() => untrack(() => {
             if(typeof action === 'object' && !!(action as A).type) {
-                // untrack so if the action somehow has references to external state, do nothing
-                untrack(() => run(action as A));
+                run(action as A);
             } else if(Array.isArray(action)) {
                 // arrays
                 action.forEach(dispatch);
@@ -96,10 +95,10 @@ export function createMutantStore<S = any, A extends Action = AnyAction>(
                 // promises
                 (action as Promise<DispatchableAction<A, S>>).then(dispatch);
             } else if(typeof action === 'function') {
-                // thunks, don't track deps within execution
-                untrack(() => action(dispatch, unwrap(state)));
+                // thunks
+                action(dispatch, unwrap(state));
             }
-        });
+        }));
     };
 
     replaceEffect(effect);
