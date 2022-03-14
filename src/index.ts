@@ -85,26 +85,22 @@ export function createMutantStore<S = any, A extends Action = AnyAction>(
         }
 
         // untrack so any accidental usage of tracked signals inside `action` is harmless
-        if(action) untrack(() => {
-            // if simple action, just run it
-            if(typeof action === 'object' && !!(action as A).type) { run(action as A); }
-
-            // promises
-            else if(typeof (action as Promise<DispatchableAction<A, S>>).then === 'function') {
+        // also nested batches are very cheap, so always ensure UI updates are deferred
+        if(action) batch(() => untrack(() => {
+            if(typeof action === 'object' && !!(action as A).type) {
+                // plain actions
+                run(action as A);
+            } else if(typeof (action as Promise<DispatchableAction<A, S>>).then === 'function') {
+                // promises
                 (action as Promise<DispatchableAction<A, S>>).then(dispatch);
+            } else if(typeof action === 'function') {
+                // thunks
+                action(dispatch, unwrap(state));
+            } else if(Array.isArray(action)) {
+                // arrays
+                action.forEach(dispatch);
             }
-
-            // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
-            else batch(() => {
-                if(Array.isArray(action)) {
-                    // arrays
-                    action.forEach(dispatch);
-                } else if(typeof action === 'function') {
-                    // thunks
-                    action(dispatch, unwrap(state));
-                }
-            })
-        });
+        }));
     };
 
     replaceEffect(effect);
