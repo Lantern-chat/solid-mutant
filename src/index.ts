@@ -84,21 +84,27 @@ export function createMutantStore<S = any, A extends Action = AnyAction>(
             throw new Error("Mutators may not dispatch actions.");
         }
 
-        // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
-        if(action) batch(() => untrack(() => {
-            if(typeof action === 'object' && !!(action as A).type) {
-                run(action as A);
-            } else if(Array.isArray(action)) {
-                // arrays
-                action.forEach(dispatch);
-            } else if(typeof (action as Promise<DispatchableAction<A, S>>).then === 'function') {
-                // promises
+        // untrack so any accidental usage of tracked signals inside `action` is harmless
+        if(action) untrack(() => {
+            // if simple action, just run it
+            if(typeof action === 'object' && !!(action as A).type) { run(action as A); }
+
+            // promises
+            else if(typeof (action as Promise<DispatchableAction<A, S>>).then === 'function') {
                 (action as Promise<DispatchableAction<A, S>>).then(dispatch);
-            } else if(typeof action === 'function') {
-                // thunks
-                action(dispatch, unwrap(state));
             }
-        }));
+
+            // batch is very cheap to nest, so wrap any nested dispatches to defer UI updates
+            else batch(() => {
+                if(Array.isArray(action)) {
+                    // arrays
+                    action.forEach(dispatch);
+                } else if(typeof action === 'function') {
+                    // thunks
+                    action(dispatch, unwrap(state));
+                }
+            })
+        });
     };
 
     replaceEffect(effect);
@@ -201,7 +207,7 @@ export interface MutantContextValue<S = any, A extends Action = AnyAction> {
     store: Store<S, A>;
 }
 
-export const MutantContext = /*#__PURE__*/ createContext<MutantContextValue>(null as any);
+export const MutantContext = /*#__PURE__*/ createContext<MutantContextValue<any, any>>(null as any);
 
 export interface ProviderProps<S = any, A extends Action = AnyAction> {
     store: Store<S, A>,
@@ -230,7 +236,7 @@ export function useMutantContext<S = RootStateOrAny, A extends Action = AnyActio
 }
 
 export function useStore<S = RootStateOrAny, A extends Action = AnyAction>() {
-    return useMutantContext().store as Store<S, A>;
+    return useMutantContext().store as unknown as Store<S, A>;
 }
 
 export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() {
