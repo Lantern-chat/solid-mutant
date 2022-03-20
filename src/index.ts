@@ -14,7 +14,7 @@ export type Thunk<A extends Action, S> = (dispatch: Dispatch<A, S>, state: DeepR
 
 // actions, thunks and promises
 export type DispatchableAction<A extends Action, S> =
-    | A
+    | A | null | undefined | false
     | Thunk<A, S>
     | Array<DispatchableAction<A, S>>
     | Promise<DispatchableAction<A, S>>;
