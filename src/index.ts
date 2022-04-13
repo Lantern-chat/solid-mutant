@@ -1,4 +1,4 @@
-import { createStore, produce, unwrap } from "solid-js/store";
+import { createStore, produce, unwrap, DeepReadonly } from "solid-js/store";
 import { Accessor, batch, createContext, createMemo, useContext, createComponent, untrack } from "solid-js";
 
 export interface Action<T = any> {
@@ -18,8 +18,6 @@ export type DispatchableAction<A extends Action, S> =
     | Thunk<A, S>
     | Array<DispatchableAction<A, S>>
     | Promise<DispatchableAction<A, S>>;
-
-export type DeepReadonly<T> = T extends {} ? { readonly [K in keyof T]: DeepReadonly<T[K]> } : T;
 
 export interface Dispatch<A extends Action, S> {
     <T extends A>(action: DispatchableAction<T, S>): void;
@@ -210,7 +208,7 @@ export interface ProviderProps<S = any, A extends Action = AnyAction> {
     children: any,
 }
 
-export function Provider<S = RootStateOrAny, A extends Action = AnyAction>(props: ProviderProps<S, A>) {
+export function MutantProvider<S = RootStateOrAny, A extends Action = AnyAction>(props: ProviderProps<S, A>) {
     return createComponent(MutantContext.Provider, {
         get value() { return { store: props.store }; },
         get children() { return props.children; }
