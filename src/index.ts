@@ -1,4 +1,4 @@
-import { createStore, produce, unwrap, DeepReadonly } from "solid-js/store";
+import { createStore, produce, unwrap } from "solid-js/store";
 import { Accessor, batch, createContext, createMemo, useContext, createComponent, untrack } from "solid-js";
 
 export interface Action<T = any> {
@@ -10,7 +10,7 @@ export interface AnyAction extends Action {
     [extraProps: string]: any
 }
 
-export type Thunk<A extends Action, S> = (dispatch: Dispatch<A, S>, state: DeepReadonly<S>) => void;
+export type Thunk<A extends Action, S> = (dispatch: Dispatch<A, S>, state: S) => void;
 
 // actions, thunks and promises
 export type DispatchableAction<A extends Action, S> =
@@ -29,18 +29,18 @@ export interface Mutator<S, A extends Action = AnyAction> {
 }
 
 export interface Store<S = any, A extends Action = AnyAction> {
-    state: DeepReadonly<S>;
+    state: S;
     dispatch: Dispatch<A, S>;
     replaceMutator(new_mutator: Mutator<S, A>): void;
     replaceEffect(new_effect: Effect<S, A> | null | undefined): void;
 }
 
 export interface Effect<S, A extends Action> {
-    (state: DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>): void;
+    (state: S, action: A, dispatch: Dispatch<A, S>): void;
 }
 
 export function combineEffects<S, A extends Action>(...effects: Array<Effect<S, A>>) {
-    return function(state: DeepReadonly<S>, action: A, dispatch: Dispatch<A, S>) {
+    return function(state: S, action: A, dispatch: Dispatch<A, S>) {
         for(let effect of effects) {
             effect(state, action, dispatch);
         }
@@ -56,7 +56,7 @@ export type InitialState<S> = Required<S> extends EmptyObject
     : { [K in keyof S]: S[K] extends string | number | boolean | symbol ? S[K] : InitialState<S[K]> };
 
 const INIT: Action = { type: '@@INIT' };
-export function createMutantStore<S = any, A extends Action = AnyAction>(
+export function createMutantStore<S extends {} = any, A extends Action = AnyAction>(
     mutator: Mutator<S, A>,
     initial: InitialState<S>,
     effect?: Effect<S, A> | null,
@@ -237,12 +237,12 @@ export function useDispatch<S = RootStateOrAny, A extends Action = AnyAction>() 
     return useStore<S, A>().dispatch;
 }
 
-export type Selector<S, T = unknown> = (state: DeepReadonly<S>) => DeepReadonly<T>;
+export type Selector<S, T = unknown> = (state: S) => T;
 
 export function useSelector<S = {}, T = unknown>(
     selector: Selector<S, T>,
     equals?: (a: T, b: T) => boolean,
-): Accessor<DeepReadonly<T>> {
+): Accessor<T> {
     const state = useStore<S>().state;
     return createMemo(() => selector(state), { equals });
 }
@@ -259,11 +259,11 @@ export type StructuredSelectorMap<S = RootStateOrAny> = {
  * Create structured-selector in-place using the current store
  */
 export function useStructuredSelector<S>(): <M extends StructuredSelectorMap<S>>(map: M) =>
-    DeepReadonly<{ [P in keyof M]: ReturnType<M[P]> }>;
+    { [P in keyof M]: ReturnType<M[P]> };
 export function useStructuredSelector<M extends StructuredSelectorMap>(map: M):
-    DeepReadonly<{ [P in keyof M]: ReturnType<M[P]> }>;
+    { [P in keyof M]: ReturnType<M[P]> };
 export function useStructuredSelector<S, Result = S>(map: { [K in keyof Result]: Selector<S, Result[K]> }):
-    DeepReadonly<{ [P in keyof Result]: Result[P] }>;
+    { [P in keyof Result]: Result[P] };
 export function useStructuredSelector(map?: any): any {
     return useSelector(createStructuredSelector(map))();
 }
@@ -381,3 +381,84 @@ export function access<S>(state: S): Access<S> {
 
     return state as Access<S>;
 }
+
+if(true) {
+    type X = Access<{
+        x: Accessor<Accessor<{
+            x: [Accessor<number>]
+        }>>,
+    }>;
+
+    interface TestState {
+        a: { x: number, y: number },
+        b: { k: string }
+    }
+
+    let selector = createStructuredSelector<TestState, { n: number, k: string }>({
+        n: state => state.a.x,
+        k: state => state.b.k,
+    });
+
+    let { n, k } = useSelector(selector)();
+
+    let selectors = useStructuredSelector<TestState>()({
+        n: state => state.a.x,
+        k: state => state.b.k,
+    });
+
+    let s2 = collectSelectors<TestState>()(
+        state => state.a.x,
+        state => state.b.k,
+    );
+
+    let [_j, _b] = useSelector(s2)();
+
+    let ss = composeSelectors<TestState>()(
+        [
+            (s: TestState) => s.a.x as number,
+            (s: TestState) => s.a.x as number
+        ],
+        (x, n) => {
+            return x() * 2
+        }
+    );
+}
+
+
+// if(false) {
+//     function test() {
+//         type MyAction = { type: string, j: number };
+
+//         interface RootState {
+//             a: {
+//                 x: number,
+//             },
+//             b: {
+//                 y: number,
+//                 k: Map<string, number>,
+//             }
+//         }
+
+//         let mutator = combineMutators({
+//             a: mutatorWithDefault(() => ({ x: 0 }), (state, a: MyAction) => { state.x += 1 }),
+//             b: mutatorWithDefault(() => ({ y: 0, k: new Map<String, number>() }), (state, a: MyAction) => { state.y += 1 }),
+//         });
+
+//         let store = createMutantStore<RootState, MyAction>(mutator, {});
+
+//         let j = useSelector((state: RootState) => state.a);
+
+//         let test = useStructuredSelector({
+//             test: (state: RootState) => state.a.x,
+//             k: (state: RootState) => {
+//                 return state.a.x
+//             }
+//         });
+
+//         let x = composeSelectors(
+//             (state) => state.a.x,
+//             (state) => state.b.y,
+//             (a, b) => { return [a(), b()] as [a: number, b: number] }
+//         );
+//     }
+// }
