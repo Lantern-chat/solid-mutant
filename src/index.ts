@@ -24,7 +24,6 @@ export interface Dispatch<A extends Action, S> {
 }
 
 export interface Mutator<S, A extends Action = AnyAction> {
-    (state: undefined, action: A): S;
     (state: S, action: A): void | undefined;
 }
 
@@ -39,14 +38,6 @@ export interface Effect<S, A extends Action> {
     (state: S, action: A, dispatch: Dispatch<A, S>): void;
 }
 
-export function combineEffects<S, A extends Action>(...effects: Array<Effect<S, A>>) {
-    return function(state: S, action: A, dispatch: Dispatch<A, S>) {
-        for(let effect of effects) {
-            effect(state, action, dispatch);
-        }
-    } as Effect<S, A>;
-}
-
 declare const $CombinedState: unique symbol;
 interface EmptyObject { readonly [$CombinedState]?: undefined }
 export type CombinedState<S> = EmptyObject & S
@@ -57,145 +48,77 @@ export type InitialState<S> = Required<S> extends EmptyObject
 
 const INIT: Action = { type: '@@INIT' };
 export function createMutantStore<S extends {} = any, A extends Action = AnyAction>(
-    mutator: Mutator<S, A>,
+    mutator: Mutator<InitialState<S>, A>,
     initial: InitialState<S>,
     effect?: Effect<S, A> | null,
 ) {
     let [state, setState] = createStore<S>(initial as S, { name: 'MutantStore' }),
-        run: (action: A) => void, is_mutating: 0 | 1 = 0;
-
-    let mutate = (action: A) => {
-        try {
-            is_mutating = 1;
-            setState(produce(s => mutator(s as any, action)));
-        } finally {
-            is_mutating = 0;
-        }
-    };
-
-    let replaceEffect = (effect: Effect<S, A> | null | undefined) => {
-        run = effect ? (action: A) => { mutate(action); effect(unwrap(state), action, dispatch) } : mutate;
-    };
-
-    let dispatch = (action: DispatchableAction<A, S>) => {
-        if(is_mutating) {
-            throw new Error("Mutators may not dispatch actions.");
-        }
-
-        // untrack so any accidental usage of tracked signals inside `action` is harmless
-        // also nested batches are very cheap, so always ensure UI updates are deferred
-        if(action) batch(() => untrack(() => {
-            if(typeof action === 'object' && !!(action as A).type) {
-                // plain actions
-                run(action as A);
-            } else if(typeof (action as Promise<DispatchableAction<A, S>>).then === 'function') {
-                // promises
-                (action as Promise<DispatchableAction<A, S>>).then(dispatch);
-            } else if(typeof action === 'function') {
-                // thunks
-                action(dispatch, unwrap(state));
-            } else if(Array.isArray(action)) {
-                // arrays
-                action.forEach(dispatch);
+        run: (action: A) => void, is_mutating: 0 | 1 = 0,
+        mutate = (action: A) => {
+            try {
+                is_mutating = 1;
+                setState(produce(s => mutator(s as any, action)));
+            } catch(e) {
+                console.error("Error dispatching action:", action);
+            } finally {
+                is_mutating = 0;
             }
-        }));
-    };
+        }, dispatch = (action: DispatchableAction<A, S>) => {
+            if(is_mutating) {
+                throw new Error("Mutators may not dispatch actions.");
+            }
+
+            // untrack so any accidental usage of tracked signals inside `action` is harmless
+            // also nested batches are very cheap, so always ensure UI updates are deferred
+            if(action) batch(() => untrack(() => {
+                if(typeof action === 'object' && !!(action as A).type) {
+                    // plain actions
+                    run(action as A);
+                } else if(typeof (action as Promise<DispatchableAction<A, S>>).then === 'function') {
+                    // promises
+                    (action as Promise<DispatchableAction<A, S>>).then(dispatch);
+                } else if(typeof action === 'function') {
+                    // thunks
+                    action(dispatch, unwrap(state));
+                } else if(Array.isArray(action)) {
+                    // arrays
+                    action.forEach(dispatch);
+                }
+            }));
+        }, replaceEffect = (effect: Effect<S, A> | null | undefined) => {
+            run = effect ? (action: A) => { mutate(action); effect(unwrap(state), action, dispatch) } : mutate;
+        }, replaceMutator = (new_mutator: Mutator<InitialState<S>, A>) => {
+            mutator = new_mutator;
+            dispatch(INIT as A); // rerun init to refresh changed mutators
+        };
 
     replaceEffect(effect);
-    dispatch(INIT as A);
+    replaceMutator(mutator); // triggers INIT
 
     return {
         state,
         dispatch,
         replaceEffect,
-        replaceMutator(new_mutator: Mutator<S, A>) {
-            mutator = new_mutator;
-            dispatch(INIT as A); // rerun init to refresh changed mutators
-        },
+        replaceMutator,
     } as Store<S, A>;
 }
 
-export type MutatorMap<S = any, A extends Action = AnyAction> = {
-    [K in keyof S]: Mutator<S[K], A>
-};
+// export type MutatorMap<S = any, A extends Action = AnyAction> = {
+//     [K in keyof S]: Mutator<S[K], A>
+// };
 
-export type StateFromMutatorMapObject<M> = M extends MutatorMap
-    ? { [P in keyof M]: M[P] extends Mutator<infer S, any> ? S : never }
-    : never
+// export type StateFromMutatorMapObject<M> = M extends MutatorMap
+//     ? { [P in keyof M]: M[P] extends Mutator<infer S, any> ? S : never }
+//     : never
 
-export type MutatorFromMutatorMap<M> =
-    M extends { [P in keyof M]: infer R } ? (R extends Mutator<any, any> ? R : never) : never
+// export type MutatorFromMutatorMap<M> =
+//     M extends { [P in keyof M]: infer R } ? (R extends Mutator<any, any> ? R : never) : never
 
-export type ActionFromMutator<M> = M extends Mutator<any, infer A> ? A : never;
+// export type ActionFromMutator<M> = M extends Mutator<any, infer A> ? A : never;
 
-export type ActionFromMutatorsMap<M> = M extends MutatorMap
-    ? ActionFromMutator<MutatorFromMutatorMap<M>>
-    : never
-
-/**
- * Combines mutators from an object key-mutator map via nesting.
- *
- * @param mutators MutatorMap<S, A>
- * @returns Mutator<S, A>
- */
-export function combineMutators<S, A extends Action = AnyAction>(mutators: MutatorMap<S, A>):
-    Mutator<CombinedState<S>, Action>;
-export function combineMutators<M extends MutatorMap>(mutators: M): Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>> {
-    let keys = Object.keys(mutators);
-
-    return mutatorWithDefault(() => ({}), function(state, action) {
-        for(let key of keys) {
-            let res = mutators[key](state[key], action);
-            if(!!res) { state[key] = res; }
-        }
-    }) as any;
-}
-
-/**
- * Same as `combineMutators`, but will attempt to filter actions by key prefix to `type`
- *
- * @param mutators  MutatorMap<S, A>
- * @returns Mutator<S, A>
- */
-export function combineMutatorsFiltered<M extends MutatorMap>(mutators: M) {
-    let keys = Object.keys(mutators);
-
-    return mutatorWithDefault(() => ({}), function(state, action) {
-        let can_filter = typeof action.type === 'string';
-        for(let key of keys) {
-            if(can_filter && !(action.type as string).startsWith(key)) continue;
-            let res = mutators[key](state[key], action);
-            if(!!res) { state[key] = res; }
-        }
-    }) as unknown as Mutator<CombinedState<StateFromMutatorMapObject<M>>, ActionFromMutatorsMap<M>>;
-}
-
-export interface MutatorWithDefault<S, A extends Action> extends Mutator<S, A> {
-    default(): S;
-}
-
-/**
- * Takes a simple half-mutator and allows to to derive a default value automatically.
- *
- * @param default_state () => S
- * @param mutator (state: S, action: A) => void
- * @returns Mutator<S, A>
- */
-export function mutatorWithDefault<S = any, A extends Action = AnyAction>(
-    default_state: () => S,
-    mutator: (state: S, action: A) => void
-) {
-    function mutate(state: S | undefined, action: A) {
-        let has_state = state ? 1 : (state = default_state(), 0);
-        mutator(state, action);
-        if(!has_state) return state;
-        else return;
-    }
-
-    mutate.default = default_state;
-
-    return mutate as MutatorWithDefault<S, A>;
-}
+// export type ActionFromMutatorsMap<M> = M extends MutatorMap
+//     ? ActionFromMutator<MutatorFromMutatorMap<M>>
+//     : never
 
 export interface MutantContextValue<S = any, A extends Action = AnyAction> {
     store: Store<S, A>;
